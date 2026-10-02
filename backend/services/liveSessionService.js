@@ -1,18 +1,13 @@
 const crypto = require("crypto");
 
-const {
-  getAverageKneeAngle,
-  updateSquatState,
-} = require("./squatRepService");
+const { getAverageKneeAngle, updateSquatState } = require("./squatRepService");
 
-const {
-  analyzeForm,
-} = require("./formAnalysisService");
+const { analyzeForm } = require("./formAnalysisService");
 
+const { smoothLandmarks } = require("./landmarkSmoothingService");
 
 // Temporary in-memory live sessions
 const activeSessions = new Map();
-
 
 // Create a new live session
 const createLiveSession = (exercise) => {
@@ -20,9 +15,14 @@ const createLiveSession = (exercise) => {
 
   const session = {
     sessionId,
+
     exercise,
 
     reps: 0,
+
+    // Store recent landmark frames
+    // for smoothing camera noise
+    landmarkHistory: [],
 
     state: "standing",
 
@@ -32,10 +32,13 @@ const createLiveSession = (exercise) => {
 
     maxKneeAngle: null,
 
+    // Store form scores
     scores: [],
 
+    // Store unique feedback messages
     feedback: [],
 
+    // Store unique issues
     issues: [],
 
     startedAt: new Date(),
@@ -43,264 +46,159 @@ const createLiveSession = (exercise) => {
     lastUpdatedAt: new Date(),
   };
 
-  activeSessions.set(
-    sessionId,
-    session
-  );
+  activeSessions.set(sessionId, session);
 
   return session;
 };
 
-
 // Get live session
 const getLiveSession = (sessionId) => {
-  return activeSessions.get(
-    sessionId
-  );
+  return activeSessions.get(sessionId);
 };
 
-
 // Process one live camera frame
-const processLiveFrame = (
-  sessionId,
-  landmarks
-) => {
-  const session =
-    activeSessions.get(
-      sessionId
-    );
+const processLiveFrame = (sessionId, landmarks) => {
+  const session = activeSessions.get(sessionId);
 
+  // Session does not exist
   if (!session) {
     return null;
   }
 
+  // Smooth landmark coordinates
+  const smoothingResult = smoothLandmarks(
+    session.landmarkHistory,
+    landmarks,
+    5,
+  );
 
-  /*
-   * Calculate knee angle
-   */
+  const smoothedLandmarks = smoothingResult.landmarks;
 
-  const kneeAngle =
-    getAverageKneeAngle(
-      landmarks
-    );
+  // Update landmark history
+  session.landmarkHistory = smoothingResult.history;
 
+  // Calculate knee angle
+  const kneeAngle = getAverageKneeAngle(smoothedLandmarks);
 
   if (kneeAngle === null) {
     return {
-      ...session,
+      sessionId,
 
-      error:
-        "Required knee landmarks are missing",
+      exercise: session.exercise,
+
+      reps: session.reps,
+
+      state: session.state,
+
+      error: "Required knee landmarks are missing",
     };
   }
 
+  // Detect squat movement
+  const previousReps = session.reps;
 
-  /*
-   * Detect squat movement
-   */
+  const repResult = updateSquatState({
+    kneeAngle,
 
-  const previousReps =
-    session.reps;
+    previousAngle: session.previousAngle,
 
-  const repResult =
-    updateSquatState({
-      kneeAngle,
+    previousState: session.state,
 
-      previousAngle:
-        session.previousAngle,
+    reps: session.reps,
+  });
 
-      previousState:
-        session.state,
+  // Analyze form using smoothed landmarks
+  const formAnalysis = analyzeForm(session.exercise, smoothedLandmarks);
 
-      reps:
-        session.reps,
-    });
+  // Update session state
+  session.reps = repResult.reps;
 
+  session.state = repResult.state;
 
-  /*
-   * Analyze form
-   */
+  session.previousAngle = kneeAngle;
 
-  const formAnalysis =
-    analyzeForm(
-      session.exercise,
-      landmarks
-    );
-
-
-  /*
-   * Update session state
-   */
-
-  session.reps =
-    repResult.reps;
-
-  session.state =
-    repResult.state;
-
-  session.previousAngle =
-    kneeAngle;
-
-
-  /*
-   * Store minimum knee angle
-   */
-
-  if (
-    session.minKneeAngle === null ||
-    kneeAngle <
-      session.minKneeAngle
-  ) {
-    session.minKneeAngle =
-      kneeAngle;
+  // Store minimum knee angle
+  if (session.minKneeAngle === null || kneeAngle < session.minKneeAngle) {
+    session.minKneeAngle = kneeAngle;
   }
 
-
-  /*
-   * Store maximum knee angle
-   */
-
-  if (
-    session.maxKneeAngle === null ||
-    kneeAngle >
-      session.maxKneeAngle
-  ) {
-    session.maxKneeAngle =
-      kneeAngle;
+  // Store maximum knee angle
+  if (session.maxKneeAngle === null || kneeAngle > session.maxKneeAngle) {
+    session.maxKneeAngle = kneeAngle;
   }
 
+  // Store form score
+  session.scores.push(formAnalysis.score);
 
-  /*
-   * Store scores
-   */
-
-  session.scores.push(
-    formAnalysis.score
-  );
-
-
-  /*
-   * Store feedback
-   */
-
-  formAnalysis.feedback.forEach(
-    (message) => {
-      if (
-        !session.feedback.includes(
-          message
-        )
-      ) {
-        session.feedback.push(
-          message
-        );
-      }
+  // Store unique feedback
+  formAnalysis.feedback.forEach((message) => {
+    if (!session.feedback.includes(message)) {
+      session.feedback.push(message);
     }
-  );
+  });
 
-
-  /*
-   * Store issues
-   */
-
-  formAnalysis.issues.forEach(
-    (issue) => {
-      if (
-        !session.issues.includes(
-          issue
-        )
-      ) {
-        session.issues.push(
-          issue
-        );
-      }
+  // Store unique issues
+  formAnalysis.issues.forEach((issue) => {
+    if (!session.issues.includes(issue)) {
+      session.issues.push(issue);
     }
-  );
+  });
 
+  // Update last activity time
+  session.lastUpdatedAt = new Date();
 
-  session.lastUpdatedAt =
-    new Date();
+  // Save updated session
+  activeSessions.set(sessionId, session);
 
-
-  activeSessions.set(
-    sessionId,
-    session
-  );
-
-
-  /*
-   * Calculate average score
-   */
-
+  // Calculate average score
   const averageScore =
     session.scores.length > 0
       ? Math.round(
-          session.scores.reduce(
-            (sum, score) =>
-              sum + score,
-            0
-          ) /
-            session.scores.length
+          session.scores.reduce((sum, score) => sum + score, 0) /
+            session.scores.length,
         )
       : 0;
 
-
+  // Return live tracking result
   return {
     sessionId,
 
-    exercise:
-      session.exercise,
+    exercise: session.exercise,
 
     kneeAngle,
 
-    position:
-      repResult.position,
+    position: repResult.position,
 
-    state:
-      repResult.state,
+    state: repResult.state,
 
-    reps:
-      repResult.reps,
+    reps: repResult.reps,
 
-    repCompleted:
-      repResult.reps >
-      previousReps,
+    repCompleted: repResult.reps > previousReps,
 
-    score:
-      formAnalysis.score,
+    score: formAnalysis.score,
 
     averageScore,
 
-    feedback:
-      formAnalysis.feedback,
+    feedback: formAnalysis.feedback,
 
-    issues:
-      formAnalysis.issues,
+    issues: formAnalysis.issues,
 
-    angles:
-      formAnalysis.angles,
+    angles: formAnalysis.angles,
 
-    status:
-      formAnalysis.status,
+    status: formAnalysis.status,
 
-    minKneeAngle:
-      session.minKneeAngle,
+    minKneeAngle: session.minKneeAngle,
 
-    maxKneeAngle:
-      session.maxKneeAngle,
+    maxKneeAngle: session.maxKneeAngle,
   };
 };
 
-
 // Remove live session
-const removeLiveSession = (
-  sessionId
-) => {
-  activeSessions.delete(
-    sessionId
-  );
+const removeLiveSession = (sessionId) => {
+  activeSessions.delete(sessionId);
 };
 
-
+// Export functions
 module.exports = {
   createLiveSession,
   getLiveSession,
