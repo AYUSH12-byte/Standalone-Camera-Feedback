@@ -3,6 +3,8 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const dotenv = require("dotenv");
+const formFeedbackRoutes = require("./routes/formFeedbackRoutes");
+
 
 const connectDB = require("./config/db");
 
@@ -23,6 +25,9 @@ app.get("/", (req, res) => {
     message: "Camera Form Feedback API is running",
   });
 });
+
+// Form feedback routes
+app.use("/api/form-feedback", formFeedbackRoutes);
 
 const PORT = process.env.PORT || 7000;
 
