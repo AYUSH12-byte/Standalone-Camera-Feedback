@@ -1,6 +1,11 @@
 const FormFeedback = require("../models/FormFeedback");
 const { analyzeForm } = require("../services/formAnalysisService");
 
+const {
+  getAverageKneeAngle,
+  updateSquatState,
+} = require("../services/squatRepService");
+
 // Analyze and save form feedback
 const analyzeAndSaveForm = async (req, res) => {
   try {
@@ -61,6 +66,70 @@ const analyzeAndSaveForm = async (req, res) => {
     });
   }
 };
+// Track live squat movement
+const trackSquat = async (req, res) => {
+  try {
+    const {
+      landmarks,
+      previousAngle,
+      previousState = "standing",
+      reps = 0,
+    } = req.body;
+
+    if (!landmarks) {
+      return res.status(400).json({
+        success: false,
+        message: "Body landmarks are required",
+      });
+    }
+
+    const kneeAngle =
+      getAverageKneeAngle(landmarks);
+
+    if (kneeAngle === null) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Required knee landmarks are missing",
+      });
+    }
+
+    const result = updateSquatState({
+      kneeAngle,
+      previousAngle:
+        previousAngle === null ||
+        previousAngle === undefined
+          ? null
+          : Number(previousAngle),
+      previousState,
+      reps: Number(reps),
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        exercise: "squat",
+        kneeAngle: result.kneeAngle,
+        position: result.position,
+        state: result.state,
+        reps: result.reps,
+        repCompleted:
+          result.reps > Number(reps),
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Track squat error:",
+      error
+    );
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to track squat",
+      error: error.message,
+    });
+  }
+};
 
 // Get all form feedback
 const getFormFeedback = async (req, res) => {
@@ -112,6 +181,7 @@ const getFormFeedbackById = async (req, res) => {
 
 module.exports = {
   analyzeAndSaveForm,
+    trackSquat,
   getFormFeedback,
   getFormFeedbackById,
 };
