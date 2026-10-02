@@ -12,16 +12,27 @@ const startLiveSession = async (req, res) => {
   try {
     const { exercise = "squat" } = req.body;
 
-    const allowedExercises = ["squat", "pushup", "plank", "lunge"];
+    const allowedExercises = [
+      "squat",
+      "pushup",
+      "plank",
+      "lunge",
+    ];
 
-    if (!allowedExercises.includes(exercise.toLowerCase())) {
+    if (
+      !allowedExercises.includes(
+        exercise.toLowerCase()
+      )
+    ) {
       return res.status(400).json({
         success: false,
         message: "Unsupported exercise",
       });
     }
 
-    const session = createLiveSession(exercise.toLowerCase());
+    const session = createLiveSession(
+      exercise.toLowerCase()
+    );
 
     res.status(201).json({
       success: true,
@@ -29,7 +40,10 @@ const startLiveSession = async (req, res) => {
       data: session,
     });
   } catch (error) {
-    console.error("Start live session error:", error);
+    console.error(
+      "Start live session error:",
+      error
+    );
 
     res.status(500).json({
       success: false,
@@ -42,7 +56,10 @@ const startLiveSession = async (req, res) => {
 // Process camera frame
 const trackLiveFrame = async (req, res) => {
   try {
-    const { sessionId, landmarks } = req.body;
+    const {
+      sessionId,
+      landmarks,
+    } = req.body;
 
     if (!sessionId) {
       return res.status(400).json({
@@ -70,11 +87,15 @@ const trackLiveFrame = async (req, res) => {
     if (session.exercise !== "squat") {
       return res.status(400).json({
         success: false,
-        message: "Live tracking for this exercise is not implemented yet",
+        message:
+          "Live tracking for this exercise is not implemented yet",
       });
     }
 
-    const result = processLiveFrame(sessionId, landmarks);
+    const result = processLiveFrame(
+      sessionId,
+      landmarks
+    );
 
     if (result?.error) {
       return res.status(400).json({
@@ -88,7 +109,10 @@ const trackLiveFrame = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error("Track live frame error:", error);
+    console.error(
+      "Track live frame error:",
+      error
+    );
 
     res.status(500).json({
       success: false,
@@ -101,7 +125,9 @@ const trackLiveFrame = async (req, res) => {
 // Get current live session
 const getCurrentLiveSession = async (req, res) => {
   try {
-    const session = getLiveSession(req.params.sessionId);
+    const session = getLiveSession(
+      req.params.sessionId
+    );
 
     if (!session) {
       return res.status(404).json({
@@ -115,7 +141,10 @@ const getCurrentLiveSession = async (req, res) => {
       data: session,
     });
   } catch (error) {
-    console.error("Get live session error:", error);
+    console.error(
+      "Get live session error:",
+      error
+    );
 
     res.status(500).json({
       success: false,
@@ -131,9 +160,6 @@ const finishLiveSession = async (req, res) => {
     const {
       sessionId,
       duration = 0,
-      averageScore = 0,
-      feedback = [],
-      issues = [],
     } = req.body;
 
     if (!sessionId) {
@@ -152,34 +178,58 @@ const finishLiveSession = async (req, res) => {
       });
     }
 
+    // Calculate average score from live frame scores
+    const scores = session.scores || [];
+
+    const averageScore =
+      scores.length > 0
+        ? Math.round(
+            scores.reduce(
+              (sum, score) => sum + score,
+              0
+            ) / scores.length
+          )
+        : 0;
+
+    // Use feedback and issues collected during the session
+    const feedback = session.feedback || [];
+    const issues = session.issues || [];
+
     const completedAt = new Date();
 
-    const workoutSession = await WorkoutSession.create({
-      exercise: session.exercise,
-      reps: session.reps,
-      duration,
-      averageScore,
-      feedback,
-      issues,
-      minKneeAngle: session.minKneeAngle,
-      maxKneeAngle: session.maxKneeAngle,
-      startedAt: session.startedAt,
-      completedAt,
-    });
+    const workoutSession =
+      await WorkoutSession.create({
+        exercise: session.exercise,
+        reps: session.reps,
+        duration,
+        averageScore,
+        feedback,
+        issues,
+        minKneeAngle: session.minKneeAngle,
+        maxKneeAngle: session.maxKneeAngle,
+        startedAt: session.startedAt,
+        completedAt,
+      });
 
+    // Remove live session after saving it
     removeLiveSession(sessionId);
 
     res.status(201).json({
       success: true,
-      message: "Workout session completed successfully",
+      message:
+        "Workout session completed successfully",
       data: workoutSession,
     });
   } catch (error) {
-    console.error("Finish live session error:", error);
+    console.error(
+      "Finish live session error:",
+      error
+    );
 
     res.status(500).json({
       success: false,
-      message: "Failed to finish workout session",
+      message:
+        "Failed to finish workout session",
       error: error.message,
     });
   }
