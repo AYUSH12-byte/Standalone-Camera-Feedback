@@ -5,6 +5,7 @@ const morgan = require("morgan");
 const dotenv = require("dotenv");
 const formFeedbackRoutes = require("./routes/formFeedbackRoutes");
 const workoutSessionRoutes = require("./routes/workoutSessionRoutes");
+const liveSessionRoutes = require("./routes/liveSessionRoutes");
 
 const connectDB = require("./config/db");
 
@@ -29,6 +30,8 @@ app.get("/", (req, res) => {
 // Form feedback routes
 app.use("/api/form-feedback", formFeedbackRoutes);
 app.use("/api/workout-sessions", workoutSessionRoutes);
+app.use("/api/live-sessions", liveSessionRoutes);
+
 
 const PORT = process.env.PORT || 7000;
 
