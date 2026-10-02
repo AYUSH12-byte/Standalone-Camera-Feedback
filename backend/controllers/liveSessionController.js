@@ -10,7 +10,9 @@ const {
 // Start live workout
 const startLiveSession = async (req, res) => {
   try {
-    const { exercise = "squat" } = req.body;
+    const {
+      exercise = "squat",
+    } = req.body;
 
     const allowedExercises = [
       "squat",
@@ -19,24 +21,30 @@ const startLiveSession = async (req, res) => {
       "lunge",
     ];
 
+    const normalizedExercise =
+      exercise.toLowerCase();
+
     if (
       !allowedExercises.includes(
-        exercise.toLowerCase()
+        normalizedExercise
       )
     ) {
       return res.status(400).json({
         success: false,
-        message: "Unsupported exercise",
+        message:
+          "Unsupported exercise",
       });
     }
 
-    const session = createLiveSession(
-      exercise.toLowerCase()
-    );
+    const session =
+      createLiveSession(
+        normalizedExercise
+      );
 
     res.status(201).json({
       success: true,
-      message: "Live workout session started",
+      message:
+        "Live workout session started",
       data: session,
     });
   } catch (error) {
@@ -47,14 +55,18 @@ const startLiveSession = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Failed to start live session",
+      message:
+        "Failed to start live session",
       error: error.message,
     });
   }
 };
 
 // Process camera frame
-const trackLiveFrame = async (req, res) => {
+const trackLiveFrame = async (
+  req,
+  res
+) => {
   try {
     const {
       sessionId,
@@ -64,27 +76,34 @@ const trackLiveFrame = async (req, res) => {
     if (!sessionId) {
       return res.status(400).json({
         success: false,
-        message: "Session ID is required",
+        message:
+          "Session ID is required",
       });
     }
 
     if (!landmarks) {
       return res.status(400).json({
         success: false,
-        message: "Body landmarks are required",
+        message:
+          "Body landmarks are required",
       });
     }
 
-    const session = getLiveSession(sessionId);
+    const session =
+      getLiveSession(sessionId);
 
     if (!session) {
       return res.status(404).json({
         success: false,
-        message: "Live session not found",
+        message:
+          "Live session not found",
       });
     }
 
-    if (session.exercise !== "squat") {
+    if (
+      session.exercise !==
+      "squat"
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -92,15 +111,25 @@ const trackLiveFrame = async (req, res) => {
       });
     }
 
-    const result = processLiveFrame(
-      sessionId,
-      landmarks
-    );
+    const result =
+      processLiveFrame(
+        sessionId,
+        landmarks
+      );
 
-    if (result?.error) {
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Live session not found",
+      });
+    }
+
+    if (result.error) {
       return res.status(400).json({
         success: false,
-        message: result.error,
+        message:
+          result.error,
       });
     }
 
@@ -116,46 +145,54 @@ const trackLiveFrame = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Failed to process camera frame",
+      message:
+        "Failed to process camera frame",
       error: error.message,
     });
   }
 };
 
 // Get current live session
-const getCurrentLiveSession = async (req, res) => {
-  try {
-    const session = getLiveSession(
-      req.params.sessionId
-    );
+const getCurrentLiveSession =
+  async (req, res) => {
+    try {
+      const session =
+        getLiveSession(
+          req.params.sessionId
+        );
 
-    if (!session) {
-      return res.status(404).json({
+      if (!session) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Live session not found",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: session,
+      });
+    } catch (error) {
+      console.error(
+        "Get live session error:",
+        error
+      );
+
+      res.status(500).json({
         success: false,
-        message: "Live session not found",
+        message:
+          "Failed to get live session",
+        error: error.message,
       });
     }
-
-    res.status(200).json({
-      success: true,
-      data: session,
-    });
-  } catch (error) {
-    console.error(
-      "Get live session error:",
-      error
-    );
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to get live session",
-      error: error.message,
-    });
-  }
-};
+  };
 
 // Finish live workout
-const finishLiveSession = async (req, res) => {
+const finishLiveSession = async (
+  req,
+  res
+) => {
   try {
     const {
       sessionId,
@@ -165,60 +202,121 @@ const finishLiveSession = async (req, res) => {
     if (!sessionId) {
       return res.status(400).json({
         success: false,
-        message: "Session ID is required",
+        message:
+          "Session ID is required",
       });
     }
 
-    const session = getLiveSession(sessionId);
+    const session =
+      getLiveSession(sessionId);
 
     if (!session) {
       return res.status(404).json({
         success: false,
-        message: "Live session not found",
+        message:
+          "Live session not found",
       });
     }
 
-    // Calculate average score from live frame scores
-    const scores = session.scores || [];
-
+    // Calculate average score
+    // using incremental score aggregation
     const averageScore =
-      scores.length > 0
+      session.scoreCount > 0
         ? Math.round(
-            scores.reduce(
-              (sum, score) => sum + score,
-              0
-            ) / scores.length
+            session.totalScore /
+              session.scoreCount
           )
         : 0;
 
-    // Use feedback and issues collected during the session
-    const feedback = session.feedback || [];
-    const issues = session.issues || [];
+    // Use feedback collected
+    // during the live workout
+    const feedback =
+      session.feedback || [];
 
-    const completedAt = new Date();
+    // Use issues collected
+    // during the live workout
+    const issues =
+      session.issues || [];
 
+    const completedAt =
+      new Date();
+
+    // Save completed workout
+    // to MongoDB
     const workoutSession =
       await WorkoutSession.create({
-        exercise: session.exercise,
-        reps: session.reps,
-        duration,
+        exercise:
+          session.exercise,
+
+        reps:
+          session.reps,
+
+        duration:
+          Number(duration),
+
         averageScore,
+
         feedback,
+
         issues,
-        minKneeAngle: session.minKneeAngle,
-        maxKneeAngle: session.maxKneeAngle,
-        startedAt: session.startedAt,
+
+        minKneeAngle:
+          session.minKneeAngle,
+
+        maxKneeAngle:
+          session.maxKneeAngle,
+
+        startedAt:
+          session.startedAt,
+
         completedAt,
       });
 
-    // Remove live session after saving it
-    removeLiveSession(sessionId);
+    // Remove temporary live session
+    // after successfully saving it
+    removeLiveSession(
+      sessionId
+    );
 
     res.status(201).json({
       success: true,
       message:
         "Workout session completed successfully",
-      data: workoutSession,
+
+      data: {
+        id:
+          workoutSession._id,
+
+        exercise:
+          workoutSession.exercise,
+
+        reps:
+          workoutSession.reps,
+
+        duration:
+          workoutSession.duration,
+
+        averageScore:
+          workoutSession.averageScore,
+
+        feedback:
+          workoutSession.feedback,
+
+        issues:
+          workoutSession.issues,
+
+        minKneeAngle:
+          workoutSession.minKneeAngle,
+
+        maxKneeAngle:
+          workoutSession.maxKneeAngle,
+
+        startedAt:
+          workoutSession.startedAt,
+
+        completedAt:
+          workoutSession.completedAt,
+      },
     });
   } catch (error) {
     console.error(
