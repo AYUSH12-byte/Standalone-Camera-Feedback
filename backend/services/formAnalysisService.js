@@ -1,17 +1,14 @@
+const { validateLandmarks } = require("../utils/landmarkValidation");
+
+// Calculate angle between 3 body landmarks
 const calculateAngle = (pointA, pointB, pointC) => {
   if (!pointA || !pointB || !pointC) {
     return null;
   }
 
   const radians =
-    Math.atan2(
-      pointC.y - pointB.y,
-      pointC.x - pointB.x
-    ) -
-    Math.atan2(
-      pointA.y - pointB.y,
-      pointA.x - pointB.x
-    );
+    Math.atan2(pointC.y - pointB.y, pointC.x - pointB.x) -
+    Math.atan2(pointA.y - pointB.y, pointA.x - pointB.x);
 
   let angle = Math.abs((radians * 180) / Math.PI);
 
@@ -25,7 +22,7 @@ const calculateAngle = (pointA, pointB, pointC) => {
 // Calculate average of available values
 const calculateAverage = (values) => {
   const validValues = values.filter(
-    (value) => value !== null && value !== undefined
+    (value) => value !== null && value !== undefined,
   );
 
   if (validValues.length === 0) {
@@ -33,10 +30,7 @@ const calculateAverage = (values) => {
   }
 
   return Math.round(
-    validValues.reduce(
-      (sum, value) => sum + value,
-      0
-    ) / validValues.length
+    validValues.reduce((sum, value) => sum + value, 0) / validValues.length,
   );
 };
 
@@ -45,54 +39,55 @@ const calculateSquatAngles = (landmarks) => {
   const leftKnee = calculateAngle(
     landmarks.leftHip,
     landmarks.leftKnee,
-    landmarks.leftAnkle
+    landmarks.leftAnkle,
   );
 
   const rightKnee = calculateAngle(
     landmarks.rightHip,
     landmarks.rightKnee,
-    landmarks.rightAnkle
+    landmarks.rightAnkle,
   );
 
   const leftHip = calculateAngle(
     landmarks.leftShoulder,
     landmarks.leftHip,
-    landmarks.leftKnee
+    landmarks.leftKnee,
   );
 
   const rightHip = calculateAngle(
     landmarks.rightShoulder,
     landmarks.rightHip,
-    landmarks.rightKnee
+    landmarks.rightKnee,
   );
 
+  /*
+   * Current back calculation uses the
+   * shoulder -> hip -> knee angle.
+   *
+   * This is kept for compatibility with
+   * the existing API response.
+   *
+   * A more advanced torso-angle calculation
+   * can be added later.
+   */
   const leftBack = calculateAngle(
     landmarks.leftShoulder,
     landmarks.leftHip,
-    landmarks.leftKnee
+    landmarks.leftKnee,
   );
 
   const rightBack = calculateAngle(
     landmarks.rightShoulder,
     landmarks.rightHip,
-    landmarks.rightKnee
+    landmarks.rightKnee,
   );
 
   return {
-    knee: calculateAverage([
-      leftKnee,
-      rightKnee,
-    ]),
+    knee: calculateAverage([leftKnee, rightKnee]),
 
-    hip: calculateAverage([
-      leftHip,
-      rightHip,
-    ]),
+    hip: calculateAverage([leftHip, rightHip]),
 
-    back: calculateAverage([
-      leftBack,
-      rightBack,
-    ]),
+    back: calculateAverage([leftBack, rightBack]),
   };
 };
 
@@ -106,6 +101,7 @@ const checkSquatDepth = (kneeAngle) => {
     };
   }
 
+  // Good squat depth
   if (kneeAngle <= 100) {
     return {
       score: 0,
@@ -114,26 +110,20 @@ const checkSquatDepth = (kneeAngle) => {
     };
   }
 
+  // Slightly shallow
   if (kneeAngle <= 120) {
     return {
       score: -10,
-      feedback: [
-        "Try to squat a little deeper."
-      ],
-      issues: [
-        "Insufficient squat depth"
-      ],
+      feedback: ["Try to squat a little deeper."],
+      issues: ["Insufficient squat depth"],
     };
   }
 
+  // Very shallow
   return {
     score: -20,
-    feedback: [
-      "Squat deeper by bending your knees more."
-    ],
-    issues: [
-      "Very shallow squat"
-    ],
+    feedback: ["Squat deeper by bending your knees more."],
+    issues: ["Very shallow squat"],
   };
 };
 
@@ -154,75 +144,58 @@ const checkKneeAlignment = (landmarks) => {
     };
   }
 
-  const leftHipToKnee =
-    Math.abs(
-      landmarks.leftHip.x -
-        landmarks.leftKnee.x
-    );
+  const leftHipToKnee = Math.abs(landmarks.leftHip.x - landmarks.leftKnee.x);
 
-  const rightHipToKnee =
-    Math.abs(
-      landmarks.rightHip.x -
-        landmarks.rightKnee.x
-    );
+  const rightHipToKnee = Math.abs(landmarks.rightHip.x - landmarks.rightKnee.x);
 
-  const leftKneeToAnkle =
-    Math.abs(
-      landmarks.leftKnee.x -
-        landmarks.leftAnkle.x
-    );
+  const leftKneeToAnkle = Math.abs(
+    landmarks.leftKnee.x - landmarks.leftAnkle.x,
+  );
 
-  const rightKneeToAnkle =
-    Math.abs(
-      landmarks.rightKnee.x -
-        landmarks.rightAnkle.x
-    );
+  const rightKneeToAnkle = Math.abs(
+    landmarks.rightKnee.x - landmarks.rightAnkle.x,
+  );
 
-  const leftDeviation =
-    leftHipToKnee +
-    leftKneeToAnkle;
+  const leftDeviation = leftHipToKnee + leftKneeToAnkle;
 
-  const rightDeviation =
-    rightHipToKnee +
-    rightKneeToAnkle;
+  const rightDeviation = rightHipToKnee + rightKneeToAnkle;
 
-  const averageDeviation =
-    (leftDeviation + rightDeviation) / 2;
+  const averageDeviation = (leftDeviation + rightDeviation) / 2;
 
   /*
-   * This is an approximate 2D camera-based
-   * knee alignment check.
+   * This is an approximate 2D
+   * camera-based knee alignment check.
+   *
+   * It is not a medical diagnosis and
+   * should be treated as an approximate
+   * visual feedback mechanism.
    */
+
+  // Good alignment
   if (averageDeviation < 0.18) {
     return {
       score: 0,
-      feedback: [
-        "Good knee alignment."
-      ],
+      feedback: ["Good knee alignment."],
       issues: [],
     };
   }
 
-  if (averageDeviation < 0.30) {
+  // Slight alignment issue
+  if (averageDeviation < 0.3) {
     return {
       score: -5,
-      feedback: [
-        "Keep your knees aligned with your feet."
-      ],
-      issues: [
-        "Knee alignment needs improvement"
-      ],
+      feedback: ["Keep your knees aligned with your feet."],
+      issues: ["Knee alignment needs improvement"],
     };
   }
 
+  // Possible knee valgus
   return {
     score: -10,
     feedback: [
-      "Your knees may be moving inward. Keep them aligned with your feet."
+      "Your knees may be moving inward. Keep them aligned with your feet.",
     ],
-    issues: [
-      "Possible knee valgus"
-    ],
+    issues: ["Possible knee valgus"],
   };
 };
 
@@ -241,57 +214,43 @@ const checkForwardLean = (landmarks) => {
     };
   }
 
-  const shoulderX =
-    (
-      landmarks.leftShoulder.x +
-      landmarks.rightShoulder.x
-    ) / 2;
+  const shoulderX = (landmarks.leftShoulder.x + landmarks.rightShoulder.x) / 2;
 
-  const hipX =
-    (
-      landmarks.leftHip.x +
-      landmarks.rightHip.x
-    ) / 2;
+  const hipX = (landmarks.leftHip.x + landmarks.rightHip.x) / 2;
 
-  const horizontalDifference =
-    Math.abs(
-      shoulderX - hipX
-    );
+  const horizontalDifference = Math.abs(shoulderX - hipX);
 
   /*
-   * Approximate forward lean from
+   * Approximate forward lean using
    * horizontal shoulder/hip displacement.
+   *
+   * This works as a basic 2D camera
+   * feedback mechanism.
    */
+
+  // Good upper-body position
   if (horizontalDifference < 0.08) {
     return {
       score: 0,
-      feedback: [
-        "Good upper-body position."
-      ],
+      feedback: ["Good upper-body position."],
       issues: [],
     };
   }
 
+  // Slight forward lean
   if (horizontalDifference < 0.15) {
     return {
       score: -5,
-      feedback: [
-        "Try to keep your upper body more controlled."
-      ],
-      issues: [
-        "Slight forward lean"
-      ],
+      feedback: ["Try to keep your upper body more controlled."],
+      issues: ["Slight forward lean"],
     };
   }
 
+  // Excessive forward lean
   return {
     score: -15,
-    feedback: [
-      "Keep your chest more upright during the squat."
-    ],
-    issues: [
-      "Excessive forward lean"
-    ],
+    feedback: ["Keep your chest more upright during the squat."],
+    issues: ["Excessive forward lean"],
   };
 };
 
@@ -308,109 +267,102 @@ const analyzeSquat = (landmarks) => {
     "rightAnkle",
   ];
 
-  const missingLandmarks =
-    requiredLandmarks.filter(
-      (landmark) =>
-        !landmarks[landmark]
+  // Validate landmarks
+  const validation = validateLandmarks(landmarks, requiredLandmarks);
+
+  // Calculate angles
+  const angles = calculateSquatAngles(landmarks);
+
+  // Stop analysis if landmarks are unreliable
+  if (!validation.valid) {
+    const feedback = [];
+    const issues = [];
+
+    if (validation.missing.length > 0) {
+      feedback.push("Some body landmarks are missing.");
+
+      issues.push(`Missing landmarks: ${validation.missing.join(", ")}`);
+    }
+
+    if (validation.lowConfidence.length > 0) {
+      feedback.push("Some body parts are not clearly visible.");
+
+      issues.push(
+        `Low-confidence landmarks: ${validation.lowConfidence.join(", ")}`,
+      );
+    }
+
+    feedback.push(
+      "Move into a position where your full body is clearly visible.",
     );
 
-  const angles =
-    calculateSquatAngles(
-      landmarks
-    );
-
-  if (missingLandmarks.length > 0) {
     return {
       score: 0,
-      feedback: [
-        "Body landmarks are incomplete.",
-        "Make sure your full body is visible in the camera.",
-      ],
-      issues: [
-        "Missing body landmarks"
-      ],
+      feedback,
+      issues,
       angles,
       status: "insufficient_data",
+      landmarkValidation: {
+        valid: validation.valid,
+        missing: validation.missing,
+        lowConfidence: validation.lowConfidence,
+      },
     };
   }
 
+  // Starting score
   let score = 100;
-
   const feedback = [];
   const issues = [];
 
-  // 1. Squat depth
-  const depthResult =
-    checkSquatDepth(
-      angles.knee
-    );
+  // Squat depth
+  const depthResult = checkSquatDepth(angles.knee);
 
   score += depthResult.score;
-  feedback.push(
-    ...depthResult.feedback
-  );
-  issues.push(
-    ...depthResult.issues
-  );
 
-  // 2. Knee alignment
-  const kneeResult =
-    checkKneeAlignment(
-      landmarks
-    );
+  feedback.push(...depthResult.feedback);
+
+  issues.push(...depthResult.issues);
+
+  // Knee alignment
+  const kneeResult = checkKneeAlignment(landmarks);
 
   score += kneeResult.score;
-  feedback.push(
-    ...kneeResult.feedback
-  );
-  issues.push(
-    ...kneeResult.issues
-  );
 
-  // 3. Forward lean
-  const leanResult =
-    checkForwardLean(
-      landmarks
-    );
+  feedback.push(...kneeResult.feedback);
+
+  issues.push(...kneeResult.issues);
+
+  // Forward lean
+  const leanResult = checkForwardLean(landmarks);
 
   score += leanResult.score;
-  feedback.push(
-    ...leanResult.feedback
-  );
-  issues.push(
-    ...leanResult.issues
-  );
 
-  // 4. Hip position
+  feedback.push(...leanResult.feedback);
+
+  issues.push(...leanResult.issues);
+
+  // Hip position
   if (angles.hip !== null) {
-    if (
-      angles.hip >= 55 &&
-      angles.hip <= 100
-    ) {
-      feedback.push(
-        "Good hip movement."
-      );
-    } else if (
-      angles.hip < 55
-    ) {
+    // Good hip movement
+    if (angles.hip >= 55 && angles.hip <= 100) {
+      feedback.push("Good hip movement.");
+    }
+
+    // Excessive hip flexion
+    else if (angles.hip < 55) {
       score -= 5;
 
-      feedback.push(
-        "Avoid folding too much at the hips."
-      );
+      feedback.push("Avoid folding too much at the hips.");
 
-      issues.push(
-        "Excessive hip flexion"
-      );
+      issues.push("Excessive hip flexion");
     }
   }
 
   // Keep score between 0 and 100
-  score = Math.max(
-    0,
-    Math.min(100, score)
-  );
+  score = Math.max(0, Math.min(100, score));
 
+  // Determine status
   let status = "good";
 
   if (score < 70) {
@@ -421,66 +373,100 @@ const analyzeSquat = (landmarks) => {
     status = "poor";
   }
 
+  // Return final analysis
   return {
     score,
-    feedback: [
-      ...new Set(feedback),
-    ],
-    issues: [
-      ...new Set(issues),
-    ],
+    feedback: [...new Set(feedback)],
+    issues: [...new Set(issues)],
     angles,
     status,
+    landmarkValidation: {
+      valid: validation.valid,
+      missing: validation.missing,
+      lowConfidence: validation.lowConfidence,
+    },
   };
 };
 
 // Main form analysis function
-const analyzeForm = (
-  exercise,
-  landmarks
-) => {
-  if (
-    !landmarks ||
-    typeof landmarks !== "object"
-  ) {
+const analyzeForm = (exercise, landmarks) => {
+  // Validate landmarks object
+  if (!landmarks || typeof landmarks !== "object") {
     return {
       score: 0,
-      feedback: [
-        "Body landmarks are required."
-      ],
-      issues: [
-        "Missing landmarks"
-      ],
+      feedback: ["Body landmarks are required."],
+      issues: ["Missing landmarks"],
       angles: {},
       status: "insufficient_data",
+      landmarkValidation: {
+        valid: false,
+        missing: [],
+        lowConfidence: [],
+      },
     };
   }
 
-  switch (
-    exercise.toLowerCase()
-  ) {
+  // Validate exercise
+  if (!exercise || typeof exercise !== "string") {
+    return {
+      score: 0,
+      feedback: ["Exercise is required."],
+      issues: ["Missing exercise"],
+      angles: {},
+      status: "invalid_exercise",
+    };
+  }
+
+  // Normalize exercise name
+  const normalizedExercise = exercise.trim().toLowerCase();
+
+  // Select exercise analyzer
+  switch (normalizedExercise) {
     case "squat":
-      return analyzeSquat(
-        landmarks
-      );
+      return analyzeSquat(landmarks);
+
+    case "pushup":
+      return {
+        score: 0,
+        feedback: ["Push-up analysis is not implemented yet."],
+        issues: ["Unsupported exercise analysis"],
+        angles: {},
+        status: "unsupported",
+      };
+
+    case "plank":
+      return {
+        score: 0,
+        feedback: ["Plank analysis is not implemented yet."],
+        issues: ["Unsupported exercise analysis"],
+        angles: {},
+        status: "unsupported",
+      };
+
+    case "lunge":
+      return {
+        score: 0,
+        feedback: ["Lunge analysis is not implemented yet."],
+        issues: ["Unsupported exercise analysis"],
+        angles: {},
+        status: "unsupported",
+      };
 
     default:
       return {
         score: 0,
-        feedback: [
-          `Form analysis for ${exercise} is not implemented yet.`,
-        ],
-        issues: [
-          "Unsupported exercise"
-        ],
+        feedback: [`Form analysis for ${exercise} is not implemented yet.`],
+        issues: ["Unsupported exercise"],
         angles: {},
         status: "unsupported",
       };
   }
 };
 
+// Exports
 module.exports = {
   calculateAngle,
+  calculateAverage,
   calculateSquatAngles,
   checkSquatDepth,
   checkKneeAlignment,
