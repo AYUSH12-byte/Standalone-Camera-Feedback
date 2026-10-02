@@ -1,15 +1,15 @@
 const express = require("express");
 
 const {
-  createFormFeedback,
+  analyzeAndSaveForm,
   getFormFeedback,
   getFormFeedbackById,
 } = require("../controllers/formFeedbackController");
 
 const router = express.Router();
 
-// Create form feedback
-router.post("/", createFormFeedback);
+// Analyze and save exercise form
+router.post("/analyze", analyzeAndSaveForm);
 
 // Get all form feedback
 router.get("/", getFormFeedback);

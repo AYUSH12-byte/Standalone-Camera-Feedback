@@ -1,18 +1,10 @@
 const FormFeedback = require("../models/FormFeedback");
+const { analyzeForm } = require("../services/formAnalysisService");
 
-// Create form feedback
-const createFormFeedback = async (req, res) => {
+// Analyze and save form feedback
+const analyzeAndSaveForm = async (req, res) => {
   try {
-    const {
-      exercise,
-      score,
-      reps,
-      duration,
-      feedback,
-      issues,
-      angles,
-      landmarks,
-    } = req.body;
+    const { exercise, reps, duration, landmarks } = req.body;
 
     if (!exercise) {
       return res.status(400).json({
@@ -21,35 +13,50 @@ const createFormFeedback = async (req, res) => {
       });
     }
 
-    if (score === undefined || score === null) {
+    if (!landmarks) {
       return res.status(400).json({
         success: false,
-        message: "Form score is required",
+        message: "Body landmarks are required",
       });
     }
 
+    // Analyze exercise form
+    const analysis = analyzeForm(exercise, landmarks);
+
+    // Save analysis result
     const formFeedback = await FormFeedback.create({
       exercise,
-      score,
-      reps,
-      duration,
-      feedback,
-      issues,
-      angles,
+      score: analysis.score,
+      reps: reps || 0,
+      duration: duration || 0,
+      feedback: analysis.feedback,
+      issues: analysis.issues,
+      angles: analysis.angles,
       landmarks,
     });
 
     res.status(201).json({
       success: true,
-      message: "Form feedback saved successfully",
-      data: formFeedback,
+      message: "Exercise form analyzed successfully",
+
+      data: {
+        id: formFeedback._id,
+        exercise: formFeedback.exercise,
+        score: analysis.score,
+        reps: formFeedback.reps,
+        duration: formFeedback.duration,
+        feedback: analysis.feedback,
+        issues: analysis.issues,
+        angles: analysis.angles,
+        status: analysis.status,
+      },
     });
   } catch (error) {
-    console.error("Create form feedback error:", error);
+    console.error("Analyze form error:", error);
 
     res.status(500).json({
       success: false,
-      message: "Failed to save form feedback",
+      message: "Failed to analyze exercise form",
       error: error.message,
     });
   }
@@ -104,7 +111,7 @@ const getFormFeedbackById = async (req, res) => {
 };
 
 module.exports = {
-  createFormFeedback,
+  analyzeAndSaveForm,
   getFormFeedback,
   getFormFeedbackById,
 };
