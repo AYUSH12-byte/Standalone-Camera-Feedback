@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Camera Form Feedback",
+    "slug": "camera-form-feedback",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Camera Form Feedback to access your camera for real-time exercise form analysis."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow Camera Form Feedback to access your camera for real-time exercise form analysis."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0F172A",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
