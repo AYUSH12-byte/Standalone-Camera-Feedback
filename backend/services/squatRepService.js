@@ -1,149 +1,272 @@
-const calculateAngle = (a, b, c) => {
-  const radians =
-    Math.atan2(c.y - b.y, c.x - b.x) -
-    Math.atan2(a.y - b.y, a.x - b.x);
+const STANDING_ANGLE = 160;
 
-  let angle = Math.abs((radians * 180) / Math.PI);
+const DESCENDING_ANGLE = 140;
 
-  if (angle > 180) {
-    angle = 360 - angle;
+const BOTTOM_ANGLE = 105;
+
+const RISING_ANGLE = 130;
+
+// Get average knee angle
+const getAverageKneeAngle = (
+  landmarks
+) => {
+  if (!landmarks) {
+    return null;
   }
 
-  return angle;
-};
+  const leftKnee =
+    landmarks.leftKnee;
 
+  const rightKnee =
+    landmarks.rightKnee;
 
-const getAverageKneeAngle = (landmarks) => {
+  if (!leftKnee || !rightKnee) {
+    return null;
+  }
+
+  const calculateAngle = (
+    pointA,
+    pointB,
+    pointC
+  ) => {
+    if (
+      !pointA ||
+      !pointB ||
+      !pointC
+    ) {
+      return null;
+    }
+
+    const vectorBA = {
+      x:
+        pointA.x -
+        pointB.x,
+
+      y:
+        pointA.y -
+        pointB.y,
+    };
+
+    const vectorBC = {
+      x:
+        pointC.x -
+        pointB.x,
+
+      y:
+        pointC.y -
+        pointB.y,
+    };
+
+    const dotProduct =
+      vectorBA.x *
+        vectorBC.x +
+      vectorBA.y *
+        vectorBC.y;
+
+    const magnitudeBA =
+      Math.sqrt(
+        vectorBA.x ** 2 +
+          vectorBA.y ** 2
+      );
+
+    const magnitudeBC =
+      Math.sqrt(
+        vectorBC.x ** 2 +
+          vectorBC.y ** 2
+      );
+
+    if (
+      magnitudeBA === 0 ||
+      magnitudeBC === 0
+    ) {
+      return null;
+    }
+
+    const cosine =
+      dotProduct /
+      (magnitudeBA *
+        magnitudeBC);
+
+    const safeCosine =
+      Math.max(
+        -1,
+        Math.min(
+          1,
+          cosine
+        )
+      );
+
+    const angle =
+      Math.acos(
+        safeCosine
+      ) *
+      (180 / Math.PI);
+
+    return angle;
+  };
+
+  const leftAngle =
+    calculateAngle(
+      landmarks.leftHip,
+      landmarks.leftKnee,
+      landmarks.leftAnkle
+    );
+
+  const rightAngle =
+    calculateAngle(
+      landmarks.rightHip,
+      landmarks.rightKnee,
+      landmarks.rightAnkle
+    );
+
   if (
-    !landmarks?.leftHip ||
-    !landmarks?.rightHip ||
-    !landmarks?.leftKnee ||
-    !landmarks?.rightKnee ||
-    !landmarks?.leftAnkle ||
-    !landmarks?.rightAnkle
+    leftAngle === null &&
+    rightAngle === null
   ) {
     return null;
   }
 
-  const leftAngle = calculateAngle(
-    landmarks.leftHip,
-    landmarks.leftKnee,
-    landmarks.leftAnkle
-  );
+  if (leftAngle === null) {
+    return Math.round(
+      rightAngle
+    );
+  }
 
-  const rightAngle = calculateAngle(
-    landmarks.rightHip,
-    landmarks.rightKnee,
-    landmarks.rightAnkle
-  );
+  if (rightAngle === null) {
+    return Math.round(
+      leftAngle
+    );
+  }
 
   return Math.round(
-    (leftAngle + rightAngle) / 2
+    (leftAngle + rightAngle) /
+      2
   );
 };
 
-
-const getSquatPosition = (kneeAngle) => {
-  if (kneeAngle === null) {
-    return "unknown";
-  }
-
-  if (kneeAngle >= 160) {
-    return "standing";
-  }
-
-  if (kneeAngle <= 100) {
-    return "bottom";
-  }
-
-  return "middle";
-};
-
-
+// Update squat state
 const updateSquatState = ({
   kneeAngle,
   previousAngle,
-  previousState = "standing",
-  reps = 0,
+  previousState,
+  reps,
 }) => {
   if (kneeAngle === null) {
     return {
-      state: previousState,
       reps,
-      kneeAngle: null,
+
+      state:
+        previousState ||
+        "standing",
+
       position: "unknown",
+
+      repCompleted: false,
     };
   }
 
-  const position = getSquatPosition(
-    kneeAngle
-  );
+  let state =
+    previousState ||
+    "standing";
 
-  let state = previousState;
   let updatedReps = reps;
 
-  /*
-   * STANDING → DESCENDING
-   */
+  let repCompleted = false;
 
+  // Standing
   if (
-    previousState === "standing" &&
-    previousAngle !== null &&
-    kneeAngle < previousAngle &&
-    position !== "standing"
+    state === "standing"
   ) {
-    state = "descending";
+    if (
+      kneeAngle <
+      DESCENDING_ANGLE
+    ) {
+      state = "descending";
+    }
   }
 
-  /*
-   * DESCENDING → BOTTOM
-   */
-
-  if (
-    previousState === "descending" &&
-    position === "bottom"
+  // Descending
+  else if (
+    state === "descending"
   ) {
-    state = "bottom";
+    if (
+      kneeAngle <=
+      BOTTOM_ANGLE
+    ) {
+      state = "bottom";
+    } else if (
+      kneeAngle >=
+      STANDING_ANGLE
+    ) {
+      state = "standing";
+    }
   }
 
-  /*
-   * BOTTOM → RISING
-   */
-
-  if (
-    previousState === "bottom" &&
-    previousAngle !== null &&
-    kneeAngle > previousAngle
+  // Bottom
+  else if (
+    state === "bottom"
   ) {
-    state = "rising";
+    if (
+      kneeAngle >
+      RISING_ANGLE
+    ) {
+      state = "rising";
+    }
   }
 
-  /*
-   * RISING → STANDING
-   *
-   * Rep completed.
-   */
+  // Rising
+  else if (
+    state === "rising"
+  ) {
+    if (
+      kneeAngle >=
+      STANDING_ANGLE
+    ) {
+      updatedReps += 1;
+
+      repCompleted = true;
+
+      state = "standing";
+    } else if (
+      kneeAngle <=
+      BOTTOM_ANGLE
+    ) {
+      state = "bottom";
+    }
+  }
+
+  // Determine user position
+  let position = "standing";
 
   if (
-    previousState === "rising" &&
-    position === "standing"
+    kneeAngle <=
+    BOTTOM_ANGLE
   ) {
-    updatedReps += 1;
-    state = "standing";
+    position = "bottom";
+  } else if (
+    kneeAngle <
+    STANDING_ANGLE
+  ) {
+    position = "squatting";
   }
 
   return {
-    state,
     reps: updatedReps,
-    kneeAngle: Math.round(kneeAngle),
+
+    state,
+
     position,
+
+    repCompleted,
   };
 };
 
-
 module.exports = {
-  calculateAngle,
   getAverageKneeAngle,
-  getSquatPosition,
   updateSquatState,
+
+  STANDING_ANGLE,
+  DESCENDING_ANGLE,
+  BOTTOM_ANGLE,
+  RISING_ANGLE,
 };
