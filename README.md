@@ -1,4 +1,4 @@
-# Camera Form Feedback
+# standalone Camera Feedback
 
 Real-time exercise form feedback using device camera and pose detection.
 
