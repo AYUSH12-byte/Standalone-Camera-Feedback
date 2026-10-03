@@ -163,12 +163,16 @@ const processLiveFrame = (sessionId, landmarks) => {
     }
   });
 
-  // 11. Collect current repetition data
-  // We only collect rep data after the user
-  // starts moving down from the standing position.
-  const repStarted = session.state === "descending" && !repResult.repCompleted;
+  // 11. Collect current repetition data.
+  // Form data is collected once the user starts moving down
+  // and continues through bottom and rising phases.
+  // Standing frames before the first squat are excluded.
+  const isActiveRepPhase =
+    session.state === "descending" ||
+    session.state === "bottom" ||
+    session.state === "rising";
 
-  if (repStarted) {
+  if (isActiveRepPhase && !repResult.repCompleted) {
     session.currentRepScores.push(formAnalysis.score);
 
     formAnalysis.feedback.forEach((message) => {

@@ -1,20 +1,44 @@
 const { validateLandmarks } = require("../utils/landmarkValidation");
 
-// Calculate angle between 3 body landmarks
+// Calculate angle between 3 body landmarks using vectors and dot product.
+// B is the joint (vertex of the angle).
 const calculateAngle = (pointA, pointB, pointC) => {
   if (!pointA || !pointB || !pointC) {
     return null;
   }
 
-  const radians =
-    Math.atan2(pointC.y - pointB.y, pointC.x - pointB.x) -
-    Math.atan2(pointA.y - pointB.y, pointA.x - pointB.x);
+  // Vectors from joint B to points A and C
+  const vectorBA = {
+    x: pointA.x - pointB.x,
+    y: pointA.y - pointB.y,
+  };
 
-  let angle = Math.abs((radians * 180) / Math.PI);
+  const vectorBC = {
+    x: pointC.x - pointB.x,
+    y: pointC.y - pointB.y,
+  };
 
-  if (angle > 180) {
-    angle = 360 - angle;
+  const dotProduct =
+    vectorBA.x * vectorBC.x + vectorBA.y * vectorBC.y;
+
+  const magnitudeBA = Math.sqrt(
+    vectorBA.x ** 2 + vectorBA.y ** 2,
+  );
+
+  const magnitudeBC = Math.sqrt(
+    vectorBC.x ** 2 + vectorBC.y ** 2,
+  );
+
+  if (magnitudeBA === 0 || magnitudeBC === 0) {
+    return null;
   }
+
+  const cosine = dotProduct / (magnitudeBA * magnitudeBC);
+
+  // Clamp cosine between -1 and 1 to prevent floating point errors
+  const safeCosine = Math.max(-1, Math.min(1, cosine));
+
+  const angle = Math.acos(safeCosine) * (180 / Math.PI);
 
   return Math.round(angle);
 };

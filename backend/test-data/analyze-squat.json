@@ -1,0 +1,13 @@
+{
+  "exercise": "squat",
+  "landmarks": {
+    "leftShoulder": { "x": 0.45, "y": 0.30, "visibility": 0.95 },
+    "rightShoulder": { "x": 0.55, "y": 0.30, "visibility": 0.95 },
+    "leftHip": { "x": 0.45, "y": 0.55, "visibility": 0.92 },
+    "rightHip": { "x": 0.55, "y": 0.55, "visibility": 0.92 },
+    "leftKnee": { "x": 0.44, "y": 0.72, "visibility": 0.90 },
+    "rightKnee": { "x": 0.56, "y": 0.72, "visibility": 0.90 },
+    "leftAnkle": { "x": 0.44, "y": 0.90, "visibility": 0.88 },
+    "rightAnkle": { "x": 0.56, "y": 0.90, "visibility": 0.88 }
+  }
+}

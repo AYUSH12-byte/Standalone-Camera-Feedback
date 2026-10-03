@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const FormFeedback = require("../models/FormFeedback");
 const { analyzeForm } = require("../services/formAnalysisService");
 
@@ -155,6 +156,14 @@ const getFormFeedback = async (req, res) => {
 // Get single form feedback
 const getFormFeedbackById = async (req, res) => {
   try {
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid form feedback ID",
+      });
+    }
+
     const feedback = await FormFeedback.findById(req.params.id);
 
     if (!feedback) {
